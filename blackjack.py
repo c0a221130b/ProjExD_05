@@ -145,6 +145,7 @@ class Image(pg.sprite.Sprite):
         '''
         引数1: カードの絵柄
         引数2: カードの数字
+        引数3: カードの座標
         '''
         super().__init__()
         self.s = s
@@ -152,6 +153,9 @@ class Image(pg.sprite.Sprite):
         self.image = pg.transform.rotozoom(pg.image.load(f'{MAIN_DIR}/playingcard-mini/{Card.card[s][r]}'), 0, 1.5)
         self.rect = self.image.get_rect()
         self.rect.center = xy
+        
+    def update(self, screen: pg.Surface):
+        screen.blit(self.image, self.rect)
 
 
 class Player():
@@ -159,17 +163,18 @@ class Player():
     プレイヤーのトータルを保存し、バースト判定を行うクラス
     '''
     def __init__(self):
-        self.total = 0
-        self.ofer = False
+        self.total = 0  # カードの合計値
+        self.bj = False  # ブラックジャックかどうか判定するフラッグ
         
     def match(self):
         '''
         トータルからバーストしていないか確認する関数
         '''
         if self.total == 21:
+            self.bj = True
             return True
         
-        elif self.total > 21:
+        elif self.total < 21:
             return True
         
         else:
@@ -212,25 +217,34 @@ class Chip():
 
 
 
-'''
-class Game():
+
+class Game(pg.sprite.Sprite):
     def __init__(self):
+        super().__init__()
+
         self.deck = Deck()
         self.p = Player()
         self.d = Player()
         
-    def draw_img(self, card, xy):
-        Image(card, xy)
+        self.pc = [self.deck.draw() for _ in range(2)]
+        self.dc = [self.deck.draw()]
+        self.dc.append(Card('None', 'None'))
         
-    def play_game(self):
-        pc1 = self.deck.draw()
-        dc1 = self.deck.draw()
-        pc2 = self.deck.draw()
+        self.p_cards = pg.sprite.Group()
+        self.d_cards = pg.sprite.Group()
+        
+        self.p.total += int(self.pc[0]) + int(self.pc[1])
+        self.d.total += int(self.dc[0])
+        
+        
+    #def add_group(self):
+        
+    def dc_draw(self):
         dc2 = self.deck.draw()
-        self.p.total += int(pc1) + int(pc2)
-        self.d.total += int(dc1) + int(dc2)
+        self.dc.append(dc2)
+        self.d.total += int(dc2)
         
-'''
+
 '''
 class Button(pg.sprite.Sprite):
     def __init__(self, text, b_color: tuple[int, int, int], hw: tuple[int, int], xy: tuple[int, int]):
@@ -255,9 +269,9 @@ class Button(pg.sprite.Sprite):
         self.sf.blit(self.tx, self.rect)
 '''
 
-def draw_text(screen, text, size, x, y, font_path=None):
+def draw_text(screen, text, size, x, y, color=(255,255,255), font_path=None):
     font = pg.font.Font(font_path, size) if font_path else pg.font.Font(None, size)
-    text_surface = font.render(text, True, (255, 255, 255))
+    text_surface = font.render(text, True, color)
     text_rect = text_surface.get_rect()
     text_rect.topleft = (x, y)
     screen.blit(text_surface, text_rect)
@@ -346,12 +360,16 @@ def main():
     d = Player()
     
     deck = Deck()
-    p1 = deck.draw() 
-    p2 = deck.draw()
-    d1 = deck.draw()
-    d2 = Card("None", "None") # 裏の画像を指定
-    
-    p.total += int(p1) + int(p2)
+    pc = [deck.draw() for _ in range(2)]
+    dc = [deck.draw()]
+    dc.append(Card("None", "None"))
+    #p1 = deck.draw() 
+    #p2 = deck.draw()
+    #d1 = deck.draw()
+    #d2 = Card("None", "None") # 裏の画像を指定
+    p.total += int(pc[0]) + int(pc[1])
+    d.total += int(dc[0])
+    #p.total += int(p1) + int(p2)
     
     
     round_max = 1  # 何ラウンドゲームを行うか
@@ -360,7 +378,6 @@ def main():
     clock = pg.time.Clock()
     
     hit_num = 0  # プレイヤーがそのラウンドでヒットした回数
-
     while round_flag:  # ラウンド数設定
         screen.fill((70, 128, 79))
         key_lst = pg.key.get_pressed()
@@ -393,13 +410,17 @@ def main():
 
 
     while True:
+            
         #key_lst = pg.key.get_pressed()
+        for i in range(2):
+            player_cards.add(Image(str(pc[i]), pc[i].r, (750+100*(i+1), 900-225)))
+            dealer_cards.add(Image(str(dc[i]), dc[i].r, (750+100*(i+1), 225)))
+        #player_cards.add(Image(str(p1), p1.r, (750, 900-225)))
+        #player_cards.add(Image(str(p2), p2.r, (850, 900-225)))
+        #dealer_cards.add(Image(str(d1), d1.r, (750, 225)))
+        #dealer_cards.add(Image(str(d2), d2.r, (850, 225)))
 
-        player_cards.add(Image(str(p1), p1.r, (750, 900-225)))
-        player_cards.add(Image(str(p2), p2.r, (850, 900-225)))
-        dealer_cards.add(Image(str(d1), d1.r, (750, 225)))
-        dealer_cards.add(Image(str(d2), d2.r, (850, 225)))
-
+        round = Round(round_max)
 
         for event in pg.event.get():
             
@@ -423,30 +444,39 @@ def main():
             if chip.bet_flag == 1:
                 Flag_game = True
                 draw_text(screen, "HIT(h) or STAND(s)", 100, 50, 700)
-                print(Flag_game, p.total)
                 if Flag_game == True:
                     if event.type == pg.KEYDOWN:
                         if event.key == pg.K_h:
                             a = deck.draw()
-                            player_cards.add(Image(str(a), a.r, (950+b, 900-225)))
+                            player_cards.add(Image(str(a), a.r, (1050+b, 900-225)))
                             p.total += int(a)
                             b += 100
                             if p.total > 21:
+                                dc[1] = deck.draw()
+                                d.total = int(dc[0]) + int(dc[1])
+                                dealer_cards.add(Image(str(dc[1]), dc[1].r, (950+z, 225)))
+                                player_cards.update(screen)
+                                dealer_cards.update(screen)
+                                pg.display.update()
                                 Flag_game = False
                                 #break
 
                         elif event.key == pg.K_s:
-                            d2 = deck.draw()  # 裏の画像を普通のトランプにかきかえ
-                            d.total += int(d1) + int(d2)
+                            dc[1] = deck.draw()  # 裏の画像を普通のトランプにかきかえ
+                            d.total += int(dc[1])
+                            dealer_cards.add(Image(str(dc[1]), dc[1].r, (950+z, 225)))
+                            dealer_cards.update(screen)
+                            pg.display.update()
                             if d.total >= 18:
                                 Flag_game = False
-                                break
                             else:
-                                while d.total < 18:
+                                while True:
+                                    z += 100
                                     x = deck.draw()
                                     dealer_cards.add(Image(str(x), x.r, (950+z, 225)))
                                     d.total += int(x)
-                                    z += 100
+                                    dealer_cards.update(screen)
+                                    pg.display.update()
                                     if d.total >= 18:
                                         Flag_game = False
                                         break
@@ -454,23 +484,98 @@ def main():
                 if Flag_game == False:
                     if p.total > 21:
                         draw_text(screen, "YOU LOSE", 100, 100, 550)
-                        #time.sleep(2)
+                        chip.now_bet = 0
+                        pg.display.update()
+                        player_cards.draw(screen)
+                        player_cards.update(screen)
+                        dealer_cards.draw(screen)
+                        dealer_cards.update(screen)
+                        chip.update(screen)
+                        hit.update(screen)
+                        stand.update(screen)
+                        round.update(screen)
+                        time.sleep(2)
+                        chip.bet_flag = 0
                         #return
                     
-                    elif p.total < 22 and d.total < 22:
+                    elif p.total <= 21 and d.total <= 21:
                         if p.total < d.total:
                             draw_text(screen, "YOU LOSE", 100, 100, 550)
-                            #time.sleep(2)
+                            chip.now_bet *= 2
+                            pg.display.update()
+                            player_cards.draw(screen)
+                            player_cards.update(screen)
+                            dealer_cards.draw(screen)
+                            dealer_cards.update(screen)
+                            chip.update(screen)
+                            hit.update(screen)
+                            stand.update(screen)
+                            round.update(screen)
+                            time.sleep(2)
+                            chip.bet_flag = 0
                             #return
-                        else:
+                        elif p.total > d.total:
                             draw_text(screen, "YOU WIN", 100, 100, 550)
-                            #time.sleep(2)
+                            chip.now_bet *= 2
+                            chip.value += chip.now_bet
+                            pg.display.update()
+                            player_cards.draw(screen)
+                            player_cards.update(screen)
+                            dealer_cards.draw(screen)
+                            dealer_cards.update(screen)
+                            chip.update(screen)
+                            hit.update(screen)
+                            stand.update(screen)
+                            round.update(screen)
+                            time.sleep(2)
+                            chip.bet_flag = 0
                             #return
                         
-                    else: 
+                    elif d.total > 21 and p.total <= 21: 
                         draw_text(screen, "YOU WIN", 100, 100, 550)
-                        #time.sleep(2)
+                        chip.now_bet *= 2
+                        chip.value += chip.now_bet
+                        pg.display.update()
+                        player_cards.draw(screen)
+                        player_cards.update(screen)
+                        dealer_cards.draw(screen)
+                        dealer_cards.update(screen)
+                        chip.update(screen)
+                        hit.update(screen)
+                        stand.update(screen)
+                        round.update(screen)
+                        time.sleep(2)
+                        chip.bet_flag = 0
                         #return
+                        
+                    p = Player()
+                    d = Player()
+    
+                    deck = Deck()
+                    pc = [deck.draw() for _ in range(2)]
+                    dc = [deck.draw()]
+                    dc.append(Card("None", "None"))
+                    p.total += int(pc[0]) + int(pc[1])
+                    d.total = int(dc[0])
+                    player_cards = pg.sprite.Group()  # プレイヤーのカードを保存するスプリットグループ
+                    dealer_cards = pg.sprite.Group() 
+                    b = 0
+                    z = 0
+                    
+                    ROUND_NOW += 1
+                    if ROUND_NOW == round_max:
+                        draw_text(screen, "END GAME", 100, 600, 400, (255, 0, 0))
+                        pg.display.update()
+                        round.update(screen)
+                        player_cards.draw(screen)
+                        player_cards.update(screen)
+                        dealer_cards.draw(screen)
+                        dealer_cards.update(screen)
+                        chip.update(screen)
+                        hit.update(screen)
+                        stand.update(screen)
+                        time.sleep(2)
+                        return
                 '''    
                 # s押下でスタンド
                 if event.type == pg.KEYDOWN and event.key == pg.K_s:
@@ -489,11 +594,18 @@ def main():
                         time.sleep(2)
                         return
                '''
+        if tmr % 10 == 0:
+            print(str(pc[0]),pc[0].r, 'P_total:', p.total, 'D_total:', d.total, 'flag:', p.total > d.total)
+            print()
+            
         player_cards.draw(screen)
+        player_cards.update(screen)
         dealer_cards.draw(screen)
+        dealer_cards.update(screen)
         chip.update(screen)
         hit.update(screen)
         stand.update(screen)
+        round.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
