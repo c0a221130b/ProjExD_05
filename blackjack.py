@@ -337,9 +337,34 @@ class Round:
         ラウンド数を更新したい
         """
         font = pg.font.SysFont(None, 100)
-        text = font.render("round "+str(ROUND_NOW)+"/"+str(self.round_max), True, (0, 255, 255))
+        text = font.render("round "+str(ROUND_NOW + 1)+"/"+str(self.round_max), True, (0, 255, 255))
         screen.blit(text, [1200, 0])
         
+
+class Bird:
+    """
+    ゲームキャラクター（こうかとん）に関するクラス
+    """
+
+    def __init__(self, num: int, xy: tuple[int, int]):
+        """
+        こうかとん画像Surfaceを生成する
+        引数1 num：こうかとん画像ファイル名の番号
+        引数2 xy：こうかとん画像の位置座標タプル
+        """
+        img0 = pg.transform.rotozoom(pg.image.load(f"{MAIN_DIR}/fig/{num}.png"), 180, 4.0)
+        img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん（右向き）
+        self.img = img0
+        self.rct = self.img.get_rect()
+        self.rct.center = xy
+
+
+    def update(self, screen: pg.Surface):
+        """
+        押下キーに応じてこうかとんを移動させる
+        引数2 screen：画面Surface
+        """
+        screen.blit(self.img, self.rct)
 
 def main():
     global ROUND_NOW
@@ -378,6 +403,9 @@ def main():
     clock = pg.time.Clock()
     
     hit_num = 0  # プレイヤーがそのラウンドでヒットした回数
+    
+    bird = Bird(3, (900, 0))
+    
     while round_flag:  # ラウンド数設定
         screen.fill((70, 128, 79))
         key_lst = pg.key.get_pressed()
@@ -431,10 +459,10 @@ def main():
                 screen.fill((70, 128, 79))
                 if event.type == pg.KEYDOWN and event.key == pg.K_UP:
                     if chip.bet < chip.value :
-                        chip.bet += 1
+                        chip.bet += 10
                 if event.type == pg.KEYDOWN and event.key == pg.K_DOWN:
                     if chip.bet > 0:
-                        chip.bet -= 1
+                        chip.bet -= 10
                 if event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
                     chip.bet_flag = 1
                     chip.now_bet = chip.bet
@@ -482,98 +510,68 @@ def main():
                                         break
                                     
                 if Flag_game == False:
-                    if p.total > 21:
-                        draw_text(screen, "YOU LOSE", 100, 100, 550)
-                        chip.now_bet = 0
-                        pg.display.update()
-                        player_cards.draw(screen)
-                        player_cards.update(screen)
-                        dealer_cards.draw(screen)
-                        dealer_cards.update(screen)
-                        chip.update(screen)
-                        hit.update(screen)
-                        stand.update(screen)
-                        round.update(screen)
-                        time.sleep(2)
-                        chip.bet_flag = 0
-                        #return
-                    
-                    elif p.total <= 21 and d.total <= 21:
-                        if p.total < d.total:
+                    if ROUND_NOW < round_max:
+                        if p.total > 21:
                             draw_text(screen, "YOU LOSE", 100, 100, 550)
-                            chip.now_bet *= 2
+                            chip.now_bet = 0
                             pg.display.update()
-                            player_cards.draw(screen)
-                            player_cards.update(screen)
-                            dealer_cards.draw(screen)
-                            dealer_cards.update(screen)
-                            chip.update(screen)
-                            hit.update(screen)
-                            stand.update(screen)
-                            round.update(screen)
                             time.sleep(2)
                             chip.bet_flag = 0
                             #return
-                        elif p.total > d.total:
+                        
+                        elif p.total <= 21 and d.total <= 21:
+                            if p.total < d.total:
+                                draw_text(screen, "YOU LOSE", 100, 100, 550)
+                                chip.now_bet *= 2
+                                pg.display.update()
+                                time.sleep(2)
+                                chip.bet_flag = 0
+                                #return
+                            elif p.total > d.total:
+                                draw_text(screen, "YOU WIN", 100, 100, 550)
+                                chip.now_bet *= 2
+                                chip.value += chip.now_bet
+                                pg.display.update()
+                                time.sleep(2)
+                                chip.bet_flag = 0
+                                #return
+                            
+                        elif d.total > 21 and p.total <= 21: 
                             draw_text(screen, "YOU WIN", 100, 100, 550)
                             chip.now_bet *= 2
                             chip.value += chip.now_bet
                             pg.display.update()
-                            player_cards.draw(screen)
-                            player_cards.update(screen)
-                            dealer_cards.draw(screen)
-                            dealer_cards.update(screen)
-                            chip.update(screen)
-                            hit.update(screen)
-                            stand.update(screen)
-                            round.update(screen)
                             time.sleep(2)
                             chip.bet_flag = 0
                             #return
+                            
+                        p = Player()
+                        d = Player()
+        
+                        deck = Deck()
+                        pc = [deck.draw() for _ in range(2)]
+                        dc = [deck.draw()]
+                        dc.append(Card("None", "None"))
+                        p.total += int(pc[0]) + int(pc[1])
+                        d.total = int(dc[0])
+                        player_cards = pg.sprite.Group()  # プレイヤーのカードを保存するスプリットグループ
+                        dealer_cards = pg.sprite.Group() 
+                        b = 0
+                        z = 0
                         
-                    elif d.total > 21 and p.total <= 21: 
-                        draw_text(screen, "YOU WIN", 100, 100, 550)
-                        chip.now_bet *= 2
-                        chip.value += chip.now_bet
-                        pg.display.update()
-                        player_cards.draw(screen)
-                        player_cards.update(screen)
-                        dealer_cards.draw(screen)
-                        dealer_cards.update(screen)
-                        chip.update(screen)
-                        hit.update(screen)
-                        stand.update(screen)
-                        round.update(screen)
-                        time.sleep(2)
-                        chip.bet_flag = 0
-                        #return
+                        ROUND_NOW += 1
                         
-                    p = Player()
-                    d = Player()
-    
-                    deck = Deck()
-                    pc = [deck.draw() for _ in range(2)]
-                    dc = [deck.draw()]
-                    dc.append(Card("None", "None"))
-                    p.total += int(pc[0]) + int(pc[1])
-                    d.total = int(dc[0])
-                    player_cards = pg.sprite.Group()  # プレイヤーのカードを保存するスプリットグループ
-                    dealer_cards = pg.sprite.Group() 
-                    b = 0
-                    z = 0
-                    
-                    ROUND_NOW += 1
                     if ROUND_NOW == round_max:
                         draw_text(screen, "END GAME", 100, 600, 400, (255, 0, 0))
+                        #round.update(screen)
+                        #player_cards.draw(screen)
+                        #player_cards.update(screen)
+                        #dealer_cards.draw(screen)
+                        #dealer_cards.update(screen)
+                        #chip.update(screen)
+                        #hit.update(screen)
                         pg.display.update()
-                        round.update(screen)
-                        player_cards.draw(screen)
-                        player_cards.update(screen)
-                        dealer_cards.draw(screen)
-                        dealer_cards.update(screen)
-                        chip.update(screen)
-                        hit.update(screen)
-                        stand.update(screen)
+                        #stand.update(screen)
                         time.sleep(2)
                         return
                 '''    
@@ -606,6 +604,7 @@ def main():
         hit.update(screen)
         stand.update(screen)
         round.update(screen)
+        bird.update(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
