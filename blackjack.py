@@ -467,7 +467,7 @@ def main():
                             dealer_cards.add(Image(str(dc[1]), dc[1].r, (950+z, 225)))
                             dealer_cards.update(screen)
                             pg.display.update()
-                            if d.total >= 18:
+                            if d.total >= 17:
                                 Flag_game = False
                             else:
                                 while True:
